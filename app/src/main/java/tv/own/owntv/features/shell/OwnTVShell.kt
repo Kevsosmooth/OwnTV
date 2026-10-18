@@ -260,6 +260,13 @@ fun OwnTVShell(
     // up/down (CH+/CH-). Guide tunes start through LiveViewModel too (they set zapSource = LIVE_TV), so
     // there is exactly ONE zap path: liveVm's. The Guide keeps its own EpgViewModel only for the grid.
     val liveVm = org.koin.androidx.compose.koinViewModel<LiveViewModel>()
+    // TV Guide style Full: the guide (and Live TV's Guide view) fills the screen with no rail; its own
+    // menu stands in for the rail (GuideFullPanel).
+    val guideStyle by settingsRepo.guideStyle.collectAsStateWithLifecycle(initialValue = tv.own.owntv.core.settings.SettingsRepository.GuideStyle.STANDARD)
+    val topLiveView by liveVm.liveView.collectAsStateWithLifecycle()
+    val guideFull = guideStyle == tv.own.owntv.core.settings.SettingsRepository.GuideStyle.FULL &&
+        (selectedSection == MainSection.EPG ||
+            (selectedSection == MainSection.LIVE_TV && topLiveView == tv.own.owntv.core.settings.SettingsRepository.LiveView.GUIDE))
     // "Previous" from the system media controls on a live channel goes back a channel.
     DisposableEffect(playbackSession, liveVm) {
         playbackSession.livePrevious = { liveVm.previousChannel() }
@@ -1021,6 +1028,18 @@ fun OwnTVShell(
               }
               onSelectSection(section)
           }
+          val guideFullNav = if (guideFull) {
+              tv.own.owntv.features.epg.GuideFullNav(
+                  sections = tv.own.owntv.features.shell.components.stageRailSections(visibleSections),
+                  selected = selectedSection,
+                  onSelect = { section ->
+                      selectFromNav(section)
+                      // The new screen has the rail again (unless it is a Full guide too, which focuses itself).
+                      scope.launch { androidx.compose.runtime.withFrameNanos { }; focusRail() }
+                  },
+                  onBack = { showExit = true },
+              )
+          } else null
           // Audio Mode: the now-playing bar — in the top bar left of the weather chip, or in the Stage
           // cluster in the Continue pill's place. Present only while PlayerMode.AUDIO.
           val audioBarContent: (@Composable () -> Unit)? = if (playerMode == PlayerMode.AUDIO) {
@@ -1092,7 +1111,7 @@ fun OwnTVShell(
                             // edge (or beside a docked rail).
                             Modifier
                                 .padding(
-                                    start = if (navStyle == tv.own.owntv.core.settings.SettingsRepository.NavStyle.DOCKED) {
+                                    start = if (!guideFull && navStyle == tv.own.owntv.core.settings.SettingsRepository.NavStyle.DOCKED) {
                                         tv.own.owntv.features.shell.components.railDockedReserve(navSize)
                                     } else 0.dp,
                                 )
@@ -1265,6 +1284,7 @@ fun OwnTVShell(
                             liveMode = true,
                             onEntryHook = { guideEntry = it },
                             onListView = { liveVm.setLiveView(tv.own.owntv.core.settings.SettingsRepository.LiveView.LIST) },
+                            fullNav = guideFullNav,
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
                             modifier = Modifier
@@ -1329,6 +1349,7 @@ fun OwnTVShell(
                             previewEnabled = playerMode == PlayerMode.NONE,
                             onEntryHook = { guideEntry = it },
                             onAddEpg = { openEpgAdd = true; onSelectSection(MainSection.SETTINGS) },
+                            fullNav = guideFullNav,
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
                             modifier = Modifier
@@ -1341,7 +1362,9 @@ fun OwnTVShell(
                 }
             }
           }
-            tv.own.owntv.features.shell.components.StageStatusCluster(
+            // The Full guide shows no pills or clock, as TiviMate's doesn't: the time is on its ruler.
+            // The Audio-mode bar still shows, being the only way to that playback.
+            if (!guideFull || audioBarContent != null) tv.own.owntv.features.shell.components.StageStatusCluster(
                 continuePill = continueTarget?.let { target ->
                     val live = target.kind == tv.own.owntv.features.home.ContinueKind.LIVE
                     tv.own.owntv.features.shell.components.ContinuePill(
@@ -1372,7 +1395,7 @@ fun OwnTVShell(
                 onPlaylistPillBounds = { playlistPillBounds = it },
                 modifier = Modifier.align(Alignment.TopEnd).onFocusChanged { clusterFocused = it.hasFocus }.focusGroup(),
             )
-            tv.own.owntv.features.shell.components.StageRail(
+            if (!guideFull) tv.own.owntv.features.shell.components.StageRail(
                 state = railState,
                 size = railSize,
                 length = navLength,

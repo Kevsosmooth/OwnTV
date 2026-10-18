@@ -77,13 +77,18 @@ internal fun ProgrammeStripCanvas(
     reminderStarts: Set<Long>,
     /** How far the timeline is scrolled, shared by every row and the ruler. */
     scrollPx: Int,
+    /**
+     * The Full guide's cells, as TiviMate draws them: radius 4, 4 px apart, one line (the icons then a
+     * 21/500 title, the times are on the ruler), and the focused one light grey with dark text, no glow.
+     */
+    singleLine: Boolean = false,
 ) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val measurer = rememberTextMeasurer(cacheSize = 64)
     val a = tv.own.owntv.ui.theme.stageAccent
     val px = with(density) { 1.mpx.toPx() }
     val pxPerMin = with(density) { GuideGridDefaults.PxPerMin.toPx() }
-    val titleStyle = tv.own.owntv.ui.theme.stageText(18, 700).copy(textDirection = TextDirection.Content)
+    val titleStyle = (if (singleLine) tv.own.owntv.ui.theme.stageText(21, 500) else tv.own.owntv.ui.theme.stageText(18, 700)).copy(textDirection = TextDirection.Content)
     val timeStyle = tv.own.owntv.ui.theme.stageText(14, 400).copy(fontFeatureSettings = "tnum", textDirection = TextDirection.Content)
     val formatTime = rememberSystemTimeFormatter()
     val rangeTemplate = stringResource(R.string.content_live_time_range_plain)
@@ -112,7 +117,12 @@ internal fun ProgrammeStripCanvas(
         }
         val viewW = size.width
         val h = size.height
-        val r = CornerRadius(14 * px)
+        val r = CornerRadius((if (singleLine) 4 else 14) * px)
+        val inset = (if (singleLine) 2 else 3) * px
+        // The Full guide's focus in a dark theme: TiviMate's light cell. A light theme keeps the accent.
+        val flatFocus = singleLine && !palette.isLight
+        val focusFill = if (flatFocus) Color(0xFFE4E6EA) else a.accent
+        val onFocus = if (flatFocus) Color(0xFF15171A) else a.onAccent
         // Feeds sometimes carry two programmes for the same time. Each one is drawn from where the one
         // before it ends, so they never sit on top of each other; one hidden completely is left out.
         var shownUntil = windowStart
@@ -121,14 +131,14 @@ internal fun ProgrammeStripCanvas(
         if (focusTime != null && programmes.none { focusTime in it.startMs until it.stopMs }) {
             val gapStart = (programmes.lastOrNull { it.stopMs <= focusTime }?.stopMs ?: windowStart).coerceAtLeast(windowStart)
             val gapEnd = (programmes.firstOrNull { it.startMs > focusTime }?.startMs ?: windowEnd).coerceAtMost(windowEnd)
-            val gx0 = (((gapStart - windowStart) / 60_000f) * pxPerMin - scrollPx + 3 * px).coerceAtLeast(0f)
-            val gx1 = (((gapEnd - windowStart) / 60_000f) * pxPerMin - scrollPx - 3 * px).coerceAtMost(viewW)
+            val gx0 = (((gapStart - windowStart) / 60_000f) * pxPerMin - scrollPx + inset).coerceAtLeast(0f)
+            val gx1 = (((gapEnd - windowStart) / 60_000f) * pxPerMin - scrollPx - inset).coerceAtMost(viewW)
             if (gx1 > gx0) {
                 val box = androidx.compose.ui.geometry.Rect(gx0, 0f, gx1, h)
-                drawBoxShadow(a.accent.copy(alpha = 0.4f), 34 * px, r.x, dy = 12 * px, bounds = box)
-                drawRoundRect(a.accent, Offset(gx0, 0f), Size(gx1 - gx0, h), r)
-                focusRing(gx0, gx1 - gx0, h, r)
-                val label = measurer.measure(emptyText, timeStyle.copy(color = a.onAccent), maxLines = 1, softWrap = false)
+                if (!singleLine) drawBoxShadow(a.accent.copy(alpha = 0.4f), 34 * px, r.x, dy = 12 * px, bounds = box)
+                drawRoundRect(focusFill, Offset(gx0, 0f), Size(gx1 - gx0, h), r)
+                if (!singleLine) focusRing(gx0, gx1 - gx0, h, r)
+                val label = measurer.measure(emptyText, timeStyle.copy(color = onFocus), maxLines = 1, softWrap = false)
                 drawText(label, topLeft = Offset(gx0 + 14 * px, (h - label.size.height) / 2f))
                 drawnAny = true
             }
@@ -138,18 +148,23 @@ internal fun ProgrammeStripCanvas(
             val e0 = p.stopMs.coerceIn(windowStart, windowEnd)
             if (e0 <= s0) return@forEachIndexed
             shownUntil = e0
-            val x = ((s0 - windowStart) / 60_000f) * pxPerMin - scrollPx.toFloat() + 3 * px
-            val w = ((e0 - s0) / 60_000f) * pxPerMin - 6 * px
+            val x = ((s0 - windowStart) / 60_000f) * pxPerMin - scrollPx.toFloat() + inset
+            val w = ((e0 - s0) / 60_000f) * pxPerMin - 2 * inset
             if (w <= 0f || x + w <= 0f || x >= viewW) return@forEachIndexed
             drawnAny = true
             val focused = focusTime != null && focusTime in p.startMs until p.stopMs
             val isNow = now in p.startMs until p.stopMs
             val fade = if (!focused && p.stopMs <= now) 0.5f else 1f
             val box = androidx.compose.ui.geometry.Rect(x, 0f, x + w, h)
-            if (focused) {
+            if (focused && singleLine) {
+                drawRoundRect(focusFill, Offset(x, 0f), Size(w, h), r)
+            } else if (focused) {
                 drawBoxShadow(a.accent.copy(alpha = 0.4f), 34 * px, r.x, dy = 12 * px, bounds = box)
                 drawRoundRect(a.accent, Offset(x, 0f), Size(w, h), r)
                 focusRing(x, w, h, r)
+            } else if (singleLine) {
+                // TiviMate's flat cells: the one on now a shade lighter, past ones barely dimmed.
+                drawRoundRect(ink.copy(alpha = if (isNow) 0.13f else if (p.stopMs <= now) 0.06f else 0.09f), Offset(x, 0f), Size(w, h), r)
             } else {
                 drawRoundRect(ink.copy(alpha = (if (isNow) 0.085f else 0.045f) * fade), Offset(x, 0f), Size(w, h), r)
             }
@@ -157,9 +172,19 @@ internal fun ProgrammeStripCanvas(
             val tx = maxOf(x, 0f)
             val textW = (x + w - tx - 28 * px).toInt()
             if (textW <= 4) return@forEachIndexed
-            val titleColor = if (focused) a.onAccent else textColor.copy(alpha = fade)
+            val titleColor = if (focused) onFocus else textColor.copy(alpha = if (singleLine) 0.85f else fade)
             val smallColor = if (focused) Color.Black.copy(alpha = 0.6f) else dimColor.copy(alpha = fade)
             val iconColor = if (focused) a.onAccent else a.accent.copy(alpha = fade)
+            if (singleLine) {
+                drawSingleLineCell(measurer, p.title, titleStyle.copy(color = titleColor), tx + 14 * px, x + w - 14 * px, h, px) { g ->
+                    when (g) {
+                        OwnTVIcon.REC -> if (p.startMs in recordingStarts) (if (focused) onFocus else recRed.copy(alpha = fade)) else null
+                        OwnTVIcon.BELL -> if (p.startMs in reminderStarts) (if (focused) onFocus else iconColor) else null
+                        else -> if (p.id in catchupIds) (if (focused) onFocus else iconColor) else null
+                    }
+                }
+                return@forEachIndexed
+            }
             val title = measurer.measure(p.title, titleStyle.copy(color = titleColor), overflow = TextOverflow.Ellipsis, maxLines = 1, softWrap = false, constraints = Constraints(maxWidth = textW))
             drawText(title, topLeft = Offset(tx + 14 * px, 8 * px))
             // The small line: icons first, 8 apart, then the time.
@@ -182,11 +207,39 @@ internal fun ProgrammeStripCanvas(
         }
         // Nothing on anywhere in view: say so, rather than a row that looks broken.
         if (!drawnAny) {
-            drawRoundRect(ink.copy(alpha = 0.03f), Offset(3 * px, 0f), Size(viewW - 6 * px, h), r)
+            drawRoundRect(ink.copy(alpha = if (singleLine) 0.06f else 0.03f), Offset(inset, 0f), Size(viewW - 2 * inset, h), r)
             val label = measurer.measure(emptyText, timeStyle.copy(color = dimColor), maxLines = 1, softWrap = false)
             drawText(label, topLeft = Offset(17 * px, (h - label.size.height) / 2f))
         }
     } }
+}
+
+/**
+ * One programme cell in a single line, centred: the recording ● / reminder bell / catch-up ↺ icons
+ * that apply ([iconColor] null = not this one), 16 px and 8 apart, then the title cut to what is left.
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSingleLineCell(
+    measurer: androidx.compose.ui.text.TextMeasurer,
+    title: String,
+    style: androidx.compose.ui.text.TextStyle,
+    left: Float,
+    right: Float,
+    h: Float,
+    px: Float,
+    iconColor: (OwnTVIcon) -> Color?,
+) {
+    var cx = left
+    val icon = 16 * px
+    for (g in listOf(OwnTVIcon.REC, OwnTVIcon.BELL, OwnTVIcon.REWIND)) {
+        val c = iconColor(g) ?: continue
+        if (cx + icon > right) return
+        drawStageGlyph(g, c, Offset(cx, (h - icon) / 2f), icon, g == OwnTVIcon.REC)
+        cx += icon + 8 * px
+    }
+    val textW = (right - cx).toInt()
+    if (textW <= 4) return
+    val text = measurer.measure(title, style, overflow = TextOverflow.Ellipsis, maxLines = 1, softWrap = false, constraints = Constraints(maxWidth = textW))
+    drawText(text, topLeft = Offset(cx, (h - text.size.height) / 2f))
 }
 
 @Composable

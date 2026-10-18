@@ -97,6 +97,10 @@ private val StageRailOrder = listOf(
     MainSection.MOVIES, MainSection.SERIES, MainSection.DOWNLOADS,
 )
 
+/** The rail's items in order: Search, the [visibleSections], then More. The Full guide's menu lists the same. */
+internal fun stageRailSections(visibleSections: Set<MainSection>): List<MainSection> =
+    StageRailOrder.filter { it == MainSection.SEARCH || it in visibleSections } + MainSection.MORE
+
 /** The rail's width with names: Normal 280 · Wide 340 · Extra wide 400; Compact is the 84 capsule. */
 private val NavSize.openWidth get() = when (this) {
     NavSize.COMPACT -> 84
@@ -161,7 +165,7 @@ fun StageRail(
         selected == MainSection.SEARCH || selected in visibleSections -> selected
         else -> StageRailOrder.firstOrNull { it in visibleSections } ?: MainSection.MORE
     }
-    val items = StageRailOrder.filter { it == MainSection.SEARCH || it in visibleSections } + MainSection.MORE
+    val items = stageRailSections(visibleSections)
 
     // Slide in from the edge (320 ms, or a snap with animations off): the capsule when it leaves
     // HIDDEN, the open rail each time it opens.
@@ -272,7 +276,7 @@ fun StageRail(
     }
 }
 
-private val MainSection.stageIcon: OwnTVIcon
+internal val MainSection.stageIcon: OwnTVIcon
     get() = when (this) {
         MainSection.SEARCH -> OwnTVIcon.SEARCH
         MainSection.HOME -> OwnTVIcon.HOME

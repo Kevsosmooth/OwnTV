@@ -180,6 +180,10 @@ internal fun GuideProgrammeBlock(
     details: String?,
     synopsis: String?,
     modifier: Modifier = Modifier,
+    /** The Full guide's smaller top area: a 46 px title. */
+    compact: Boolean = false,
+    /** Squeezed by the Full guide's menu: the title takes two lines at 38 px, as TiviMate's does. */
+    narrow: Boolean = false,
 ) {
     val a = stageAccent
     Column(modifier) {
@@ -191,8 +195,14 @@ internal fun GuideProgrammeBlock(
         }
         if (title != null) {
             Text(
-                title, style = stageText(60, 800, (-1.5).mpxSp), color = StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 10.mpx, bottom = 6.mpx),
+                title,
+                style = when {
+                    narrow -> stageText(38, 800, (-0.5).mpxSp)
+                    compact -> stageText(46, 800, (-1).mpxSp)
+                    else -> stageText(60, 800, (-1.5).mpxSp)
+                },
+                color = StageColors.Text, maxLines = if (narrow) 2 else 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = if (compact) 6.mpx else 10.mpx, bottom = 6.mpx),
             )
         }
         if (details != null) Text(details, style = stageText(19, 400), color = StageColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -256,25 +266,40 @@ internal fun GuideRuler(
 
 /**
  * A channel's label column: the playlist's 7 px dot, the number (38 wide, 17/700 dim), the
- * logo on a 58×40 plate, the name 17/700. The row the focus is in has its number and name in accent.
+ * logo on a 58×40 plate, the name 17/700 — or the Full guide's bigger ones ([look]). The row the
+ * focus is in has its number and name in accent.
  */
 @Composable
-internal fun GuideChannelLabel(channel: ChannelEntity, name: String, dot: Color?, selected: Boolean, numberWidth: Dp, modifier: Modifier = Modifier) {
+internal fun GuideChannelLabel(
+    channel: ChannelEntity,
+    name: String,
+    dot: Color?,
+    selected: Boolean,
+    numberWidth: Dp,
+    modifier: Modifier = Modifier,
+    look: GuideLook = GuideLook.Standard,
+    /** Shown when the channel has no number of its own: its place in the list, as TiviMate numbers them. */
+    fallbackNumber: Int? = null,
+) {
     val a = stageAccent
     Row(
         modifier.padding(start = 8.mpx),
-        horizontalArrangement = Arrangement.spacedBy(10.mpx),
+        horizontalArrangement = Arrangement.spacedBy(if (look.full) 14.mpx else 10.mpx),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(7.mpx).background(dot ?: Color.Transparent, RoundedCornerShape(50)))
         Text(
-            channel.number?.toString().orEmpty(),
-            style = stageText(17, 700).copy(fontFeatureSettings = Tabular), color = if (selected) a.accent else StageColors.Dim,
+            (channel.number ?: fallbackNumber)?.toString().orEmpty(),
+            style = stageText(look.numberSize, look.labelWeight).copy(fontFeatureSettings = Tabular), color = if (selected) a.accent else StageColors.Dim,
             // Always whole: the column fits the longest number in the list; only the name is cut.
             maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(numberWidth),
         )
-        LivePlate(channel.displayLogoUrl, 58.mpx, 40.mpx, radius = 10.mpx)
-        Text(name, style = stageText(17, 700), color = if (selected) a.accent else StageColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        // The Full guide shows the logo bare, as TiviMate does.
+        LivePlate(channel.displayLogoUrl, look.logoWidth, look.logoHeight, radius = 10.mpx, fill = if (look.full) Color.Transparent else StageColors.ControlFill)
+        Text(
+            name, style = stageText(look.nameSize, look.labelWeight), color = if (selected) a.accent else StageColors.Text,
+            maxLines = look.nameLines, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+        )
     }
 }
 

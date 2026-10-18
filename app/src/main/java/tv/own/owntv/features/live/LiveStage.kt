@@ -203,9 +203,10 @@ internal fun LivePlate(
     width: androidx.compose.ui.unit.Dp,
     height: androidx.compose.ui.unit.Dp,
     radius: androidx.compose.ui.unit.Dp = StageRadii.Plate,
+    fill: Color = StageColors.ControlFill,
 ) {
     Box(Modifier.size(width, height).clip(RoundedCornerShape(radius))) {
-        ChannelLogoTile(logoUrl = logoUrl, modifier = Modifier.fillMaxSize(), fill = StageColors.ControlFill) {
+        ChannelLogoTile(logoUrl = logoUrl, modifier = Modifier.fillMaxSize(), fill = fill) {
             OwnTVIcon(OwnTVIcon.LIVE_TV, tint = StageColors.Dim, modifier = Modifier.align(Alignment.Center).size(height * 0.5f))
         }
     }

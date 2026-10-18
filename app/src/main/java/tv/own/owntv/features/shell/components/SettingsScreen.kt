@@ -962,6 +962,7 @@ fun SettingsScreen(
             navigationSearchEntry(settingsVm) { saveScroll(); dialogReturn = searchFieldFocus; showNavigation = true },
             liveLayoutSearchEntry(settingsVm) { saveScroll(); dialogReturn = searchFieldFocus; showLiveLayout = true },
             SettingsSearchEntry(stringResource(R.string.settings_group_layout), stringResource(R.string.settings_live_opens_in), stringResource(R.string.settings_search_keywords_live_opens_in), OwnTVIcon.LIVE_TV, TileTone.PRIMARY) { saveScroll(); dialogReturn = searchFieldFocus; stageSettings.open = StageSettingsDialog.LIVE_OPENS_IN },
+            SettingsSearchEntry(stringResource(R.string.settings_group_layout), stringResource(R.string.settings_guide_style), stringResource(R.string.settings_search_keywords_guide_style), OwnTVIcon.EPG, TileTone.PRIMARY) { saveScroll(); dialogReturn = searchFieldFocus; stageSettings.open = StageSettingsDialog.GUIDE_STYLE },
             SettingsSearchEntry(stringResource(R.string.settings_group_sources), stringResource(R.string.settings_reminders), stringResource(R.string.settings_search_keywords_reminders), OwnTVIcon.BELL, TileTone.SECONDARY) { saveScroll(); dialogReturn = searchFieldFocus; stageSettings.open = StageSettingsDialog.REMINDERS },
             SettingsSearchEntry(stringResource(R.string.settings_group_layout), stringResource(R.string.settings_ch_paging), stringResource(R.string.settings_search_keywords_ch), OwnTVIcon.CH_NAV, TileTone.PRIMARY,
                 chip = if (chNavEnabled) stringResource(R.string.common_on) else stringResource(R.string.common_off), chipTone = if (chNavEnabled) TileTone.PRIMARY else TileTone.SECONDARY) { open(SettingsTab.CH_NAV) },
@@ -1714,7 +1715,7 @@ private fun GuideDaysDialog(settingsVm: SettingsViewModel, guideDays: Int, onClo
     )
 }
 
-private enum class StageSettingsDialog { LIVE_OPENS_IN, REMINDERS, REMINDER_LEAD }
+private enum class StageSettingsDialog { LIVE_OPENS_IN, GUIDE_STYLE, REMINDERS, REMINDER_LEAD }
 
 /** Which Stage picker is open, and each row's focus to come back to. */
 @androidx.compose.runtime.Stable
@@ -1723,11 +1724,30 @@ private class StageSettingsState {
     val focus = StageSettingsDialog.entries.associateWith { FocusRequester() }
 }
 
-/** Layout: Live TV opens in. [onOpen] saves the scroll and names the focus to return to. */
+/** Layout: Live TV opens in, TV Guide style. [onOpen] saves the scroll and names the focus to return to. */
 @Composable
 private fun stageLayoutRows(settingsVm: SettingsViewModel, state: StageSettingsState, onOpen: (FocusRequester) -> Unit): List<RootRow> {
     val f = state.focus.getValue(StageSettingsDialog.LIVE_OPENS_IN)
-    return listOf(liveOpensInRootRow(settingsVm, f) { onOpen(f); state.open = StageSettingsDialog.LIVE_OPENS_IN })
+    val g = state.focus.getValue(StageSettingsDialog.GUIDE_STYLE)
+    return listOf(
+        liveOpensInRootRow(settingsVm, f) { onOpen(f); state.open = StageSettingsDialog.LIVE_OPENS_IN },
+        guideStyleRootRow(settingsVm, g) { onOpen(g); state.open = StageSettingsDialog.GUIDE_STYLE },
+    )
+}
+
+/** Layout › TV Guide style: Standard or Full. */
+@Composable
+private fun guideStyleRootRow(settingsVm: SettingsViewModel, focus: FocusRequester, onClick: () -> Unit): RootRow {
+    val style by settingsVm.guideStyle.collectAsStateWithLifecycle()
+    return RootRow(
+        "guide_style", TileTone.PRIMARY, OwnTVIcon.EPG,
+        title = stringResource(R.string.settings_guide_style),
+        desc = stringResource(R.string.settings_guide_style_description),
+        chip = stringResource(tv.own.owntv.features.settings.guideStyleLabelRes(style)),
+        chipTone = if (style == tv.own.owntv.core.settings.SettingsRepository.GuideStyle.FULL) TileTone.PRIMARY else TileTone.SECONDARY,
+        focus = focus,
+        onClick = onClick,
+    )
 }
 
 /** The guide block: Programme reminders, Reminder time. */
@@ -1746,6 +1766,7 @@ private fun StageSettingsDialogHost(settingsVm: SettingsViewModel, state: StageS
     val close = { state.open = null }
     when (state.open) {
         StageSettingsDialog.LIVE_OPENS_IN -> LiveOpensInDialog(settingsVm, close)
+        StageSettingsDialog.GUIDE_STYLE -> tv.own.owntv.features.settings.GuideStyleDialog(settingsVm, close)
         StageSettingsDialog.REMINDERS -> RemindersDialog(settingsVm, close)
         StageSettingsDialog.REMINDER_LEAD -> ReminderLeadDialog(settingsVm, close)
         null -> Unit
