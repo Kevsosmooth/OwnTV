@@ -41,6 +41,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import tv.own.owntv.core.epg.displayLogoUrl
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -220,6 +221,21 @@ fun OwnTVShell(
     var downloadsEntry by remember { mutableStateOf<(() -> Boolean)?>(null) }
     var moreEntry by remember { mutableStateOf<(() -> Boolean)?>(null) }
     var sportsEntry by remember { mutableStateOf<(() -> Boolean)?>(null) }
+    // The open screen's own way in, when it has one (Home returns to the exact control left from).
+    val sectionEntry: (() -> Boolean)? = when (selectedSection) {
+        MainSection.HOME -> homeEntry
+        MainSection.EPG, MainSection.LIVE_TV -> guideEntry
+        MainSection.MOVIES, MainSection.SERIES -> vodEntry
+        MainSection.DOWNLOADS -> downloadsEntry
+        MainSection.MORE -> moreEntry
+        MainSection.SPORTS -> sportsEntry
+        else -> null
+    }
+    // Navigation = Full height (PanelRail): its state lives in [PanelNav], out of this already long body.
+    val panel = tv.own.owntv.features.shell.components.rememberPanelNav(
+        navStyle == tv.own.owntv.core.settings.SettingsRepository.NavStyle.PANEL, sectionEntry, contentAreaFocus,
+    )
+    val panelNav = panel.enabled
     // Home's Live sports row opens a match page through the same request the player's Match button uses.
     val sportsMatchRequests = koinInject<tv.own.owntv.features.sports.SportsPlayback>()
     // More › Settings opens Settings at a group, or with its search open.
@@ -502,6 +518,8 @@ fun OwnTVShell(
             }
             tv.own.owntv.core.settings.StartupMode.HOME -> Unit
         }
+        // Full height: focus was parked in Home, which the start-up screen just replaced; hand it over.
+        if (panel.enabled && playerMode == PlayerMode.NONE) panel.park(focusRail)
     }
 
     // Movies/Series/Live load on first open via their reactive Paging flows — their indexed first page is
@@ -559,7 +577,7 @@ fun OwnTVShell(
         subtitleController.clear() // leaving the player drops the OpenSubtitles item context
         if (selectedSection != MainSection.LIVE_TV) liveVm.clearLiveOnExo()
         restoreFocus = true
-        focusRail()
+        panel.park(focusRail)
         Unit
     }
     // A one-stream playlist that a download was using: core paused the download; this asks what next.
@@ -626,7 +644,7 @@ fun OwnTVShell(
         resumeVideo()
         playerMode = PlayerMode.MINI
         restoreFocus = true
-        focusRail()
+        panel.park(focusRail)
         Unit
     }
     // Switch the current stream to audio-only and surface the now-playing bar in the top bar. Stop the
@@ -635,7 +653,7 @@ fun OwnTVShell(
         (if (liveOnExo) liveVm.previewEngine else mpvEngine).enterAudioOnly()
         playerMode = PlayerMode.AUDIO
         restoreFocus = true
-        focusRail()
+        panel.park(focusRail)
         Unit
     }
 
@@ -688,6 +706,7 @@ fun OwnTVShell(
         railIdleHidden -> tv.own.owntv.features.shell.components.RailState.HIDDEN
         else -> tv.own.owntv.features.shell.components.RailState.CAPSULE
     }
+    val panelPush by panel.track(railHasFocus)
     // The playlist chip reflects the active filter: "All playlists" when none is chosen (id <= 0), the
     // chosen playlist's name otherwise. With a single playlist there's nothing to switch, so just its name.
     val playlistLabel = when {
@@ -738,7 +757,7 @@ fun OwnTVShell(
         // to the persistent sidebar after the new destination has rendered.
         scope.launch {
             withFrameNanos { }
-            focusRail()
+            panel.park(focusRail)
         }
     }
     val dispatchRemoteShortcut: (RemoteShortcutAction) -> Unit = { action ->
@@ -790,7 +809,7 @@ fun OwnTVShell(
     LaunchedEffect(sidebarFocus) {
         tv.own.owntv.core.util.Perf.stamp("shell-composed")
         withFrameNanos { }
-        focusRail()
+        panel.park(focusRail)
     }
 
     LaunchedEffect(pendingDeepLink, activeProfileId) {
@@ -880,8 +899,9 @@ fun OwnTVShell(
             selectedSection == MainSection.SETTINGS -> { restoreFocus = true; onSelectSection(MainSection.MORE) }
             // Reached from a Search result: Back returns to Search once, its query, tab and row kept.
             searchReturn == selectedSection && focusedLayer != ShellLayer.SIDEBAR -> returnToSearch()
+            panelNav && !guideFull && railHasFocus && !panel.shown -> panel.shown = true
             focusedLayer == ShellLayer.SIDEBAR -> showExit = true
-            else -> focusRail()
+            else -> { panel.shown = true; focusRail() }
         }
     }
 
@@ -917,9 +937,13 @@ fun OwnTVShell(
         modifier = modifier.fillMaxSize().background(shellBase)
             .onPreviewKeyEvent { e ->
                 if (e.type == KeyEventType.KeyDown) {
-                    if (e.key == Key.DirectionLeft || e.key == Key.DirectionRight) railKeyAt = android.os.SystemClock.uptimeMillis()
+                    if (e.key == Key.DirectionLeft || e.key == Key.DirectionRight) {
+                        railKeyAt = android.os.SystemClock.uptimeMillis()
+                        panel.keyAt = railKeyAt
+                    }
                     // A key pressed on the rail is the user using it, however focus got there.
                     if (railHasFocus) railFocused = true
+                    if (railHasFocus) panel.onRailKey(e.key)
                 }
                 if (e.key != Key.Back) return@onPreviewKeyEvent false
                 when (e.type) {
@@ -1034,8 +1058,9 @@ fun OwnTVShell(
                   selected = selectedSection,
                   onSelect = { section ->
                       selectFromNav(section)
-                      // The new screen has the rail again (unless it is a Full guide too, which focuses itself).
-                      scope.launch { androidx.compose.runtime.withFrameNanos { }; focusRail() }
+                      // The new screen has the rail again (unless it is a Full guide too, which focuses
+                      // itself); with Full height navigation it is entered instead.
+                      if (panelNav) panel.enterPicked() else scope.launch { androidx.compose.runtime.withFrameNanos { }; focusRail() }
                   },
                   onBack = { showExit = true },
               )
@@ -1110,6 +1135,8 @@ fun OwnTVShell(
                             // The floating rail sits over the content, so the content starts at the screen
                             // edge (or beside a docked rail).
                             Modifier
+                                // Full height pushes the content over, as TiviMate's menu does.
+                                .graphicsLayer { translationX = panelPush.toPx() * (if (contentLtr) 1f else -1f) }
                                 .padding(
                                     start = if (!guideFull && navStyle == tv.own.owntv.core.settings.SettingsRepository.NavStyle.DOCKED) {
                                         tv.own.owntv.features.shell.components.railDockedReserve(navSize)
@@ -1122,6 +1149,7 @@ fun OwnTVShell(
                                     val back = if (contentLtr) Key.DirectionLeft else Key.DirectionRight
                                     if (e.key != back || e.type != KeyEventType.KeyDown) return@onKeyEvent false
                                     if (!contentFocusManager.moveFocus(if (contentLtr) androidx.compose.ui.focus.FocusDirection.Left else androidx.compose.ui.focus.FocusDirection.Right)) {
+                                        panel.shown = true
                                         focusRail()
                                     }
                                     true
@@ -1234,7 +1262,7 @@ fun OwnTVShell(
                                 sportsMatchRequests.pendingMatch.value = m to null
                                 onSelectSection(MainSection.SPORTS)
                             },
-                            contentStart = if (navStyle == tv.own.owntv.core.settings.SettingsRepository.NavStyle.DOCKED) 64.mpx else 150.mpx,
+                            contentStart = if (navStyle != tv.own.owntv.core.settings.SettingsRepository.NavStyle.FLOATING) 64.mpx else 150.mpx,
                             modifier = Modifier.fillMaxSize(),
                         )
 
@@ -1300,6 +1328,9 @@ fun OwnTVShell(
                             previewEnabled = playerMode == PlayerMode.NONE,
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
+                            // Full height enters the list on its channel; the rail styles keep ▶'s own way.
+                            onEntryHook = if (panelNav) { { guideEntry = it } } else null,
+                            onPanelSheet = if (panelNav) panel::sheet else null,
                             modifier = Modifier.fillMaxSize(),
                         )
 
@@ -1309,6 +1340,7 @@ fun OwnTVShell(
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
                             onEntryHook = { vodEntry = it },
+                            onPanelSheet = if (panelNav) panel::sheet else null,
                             modifier = Modifier.fillMaxSize(),
                         )
 
@@ -1318,6 +1350,7 @@ fun OwnTVShell(
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
                             onEntryHook = { vodEntry = it },
+                            onPanelSheet = if (panelNav) panel::sheet else null,
                             modifier = Modifier.fillMaxSize(),
                         )
 
@@ -1328,7 +1361,7 @@ fun OwnTVShell(
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
                             onEntryHook = { downloadsEntry = it },
-                            contentStart = if (navStyle == tv.own.owntv.core.settings.SettingsRepository.NavStyle.DOCKED) 64.mpx else 150.mpx,
+                            contentStart = if (navStyle != tv.own.owntv.core.settings.SettingsRepository.NavStyle.FLOATING) 64.mpx else 150.mpx,
                             modifier = Modifier.fillMaxSize(),
                         )
 
@@ -1338,7 +1371,7 @@ fun OwnTVShell(
                             onChildFocused = { focusedLayer = ShellLayer.CONTENT },
                             onEntryHook = { sportsEntry = it },
                             active = playerMode == PlayerMode.NONE,
-                            contentStart = if (navStyle == tv.own.owntv.core.settings.SettingsRepository.NavStyle.DOCKED) 64.mpx else 150.mpx,
+                            contentStart = if (navStyle != tv.own.owntv.core.settings.SettingsRepository.NavStyle.FLOATING) 64.mpx else 150.mpx,
                             modifier = Modifier.fillMaxSize(),
                         )
 
@@ -1363,8 +1396,9 @@ fun OwnTVShell(
             }
           }
             // The Full guide shows no pills or clock, as TiviMate's doesn't: the time is on its ruler.
-            // The Audio-mode bar still shows, being the only way to that playback.
-            if (!guideFull || audioBarContent != null) tv.own.owntv.features.shell.components.StageStatusCluster(
+            // The Audio-mode bar still shows, being the only way to that playback. The Full height menu,
+            // with the content moved aside beneath them, hides them too while it is open.
+            if ((!guideFull && panelPush == 0.dp) || audioBarContent != null) tv.own.owntv.features.shell.components.StageStatusCluster(
                 continuePill = continueTarget?.let { target ->
                     val live = target.kind == tv.own.owntv.features.home.ContinueKind.LIVE
                     tv.own.owntv.features.shell.components.ContinuePill(
@@ -1395,7 +1429,19 @@ fun OwnTVShell(
                 onPlaylistPillBounds = { playlistPillBounds = it },
                 modifier = Modifier.align(Alignment.TopEnd).onFocusChanged { clusterFocused = it.hasFocus }.focusGroup(),
             )
-            if (!guideFull) tv.own.owntv.features.shell.components.StageRail(
+            if (!guideFull && panelNav) tv.own.owntv.features.shell.components.PanelRail(
+                step = panel.step(railHasFocus),
+                selected = selectedSection,
+                visibleSections = visibleSections,
+                onSelect = { section -> selectFromNav(section); panel.enterPicked() },
+                onShow = { panel.shown = true },
+                enterContent = panel::enterContent,
+                selectedItemFocusRequester = sidebarFocus,
+                onFocused = { focusedLayer = ShellLayer.SIDEBAR },
+                nowPlaying = nowPlayingRail,
+                onNowPlaying = enterNowPlaying,
+                modifier = Modifier.align(Alignment.CenterStart),
+            ) else if (!guideFull) tv.own.owntv.features.shell.components.StageRail(
                 state = railState,
                 size = railSize,
                 length = navLength,
@@ -1412,15 +1458,7 @@ fun OwnTVShell(
                 avatarPath = avatarPath,
                 selectedItemFocusRequester = sidebarFocus,
                 contentFocusRequester = contentAreaFocus,
-                enterContent = when (selectedSection) {
-                    MainSection.HOME -> homeEntry
-                    MainSection.EPG, MainSection.LIVE_TV -> guideEntry
-                    MainSection.MOVIES, MainSection.SERIES -> vodEntry
-                    MainSection.DOWNLOADS -> downloadsEntry
-                    MainSection.MORE -> moreEntry
-                    MainSection.SPORTS -> sportsEntry
-                    else -> null
-                },
+                enterContent = sectionEntry,
                 onFocused = { focusedLayer = ShellLayer.SIDEBAR },
                 nowPlaying = nowPlayingRail,
                 onNowPlaying = enterNowPlaying,

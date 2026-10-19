@@ -67,6 +67,7 @@ fun NavigationSettingsPopup(
     val styles = listOf(
         NavStyle.FLOATING to (R.string.settings_nav_floating to R.string.settings_nav_floating_desc),
         NavStyle.DOCKED to (R.string.settings_nav_docked to R.string.settings_nav_docked_desc),
+        NavStyle.PANEL to (R.string.settings_nav_panel to R.string.settings_nav_panel_desc),
     )
 
     StagePopup(onDismiss = onDismiss, title = stringResource(R.string.settings_navigation), eyebrow = eyebrow) {
@@ -80,14 +81,15 @@ fun NavigationSettingsPopup(
             )
         }
         StagePopupDivider()
-        StagePopupOption(
+        // Full height has one size and length: the screens, as TiviMates menu.
+        if (style != NavStyle.PANEL) StagePopupOption(
             title = stringResource(R.string.settings_size),
             subtitle = stringResource(R.string.settings_nav_size_desc),
             value = stringResource(size.labelRes),
             onClick = { onSize(NavSize.entries[(size.ordinal + 1) % NavSize.entries.size]) },
             leading = { OwnTVIcon(OwnTVIcon.EXPAND, StageColors.Text, Modifier.size(21.mpx)) },
         )
-        StagePopupOption(
+        if (style != NavStyle.PANEL) StagePopupOption(
             title = stringResource(R.string.settings_nav_length),
             subtitle = stringResource(R.string.settings_nav_length_desc),
             value = stringResource(if (length == NavLength.FIT) R.string.settings_nav_length_fit else R.string.settings_nav_length_full),

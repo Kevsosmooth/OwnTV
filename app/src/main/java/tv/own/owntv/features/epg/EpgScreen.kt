@@ -260,6 +260,10 @@ fun EpgScreen(
     BackHandler(enabled = inCellMode && gridHasFocus) { inCellMode = false }
     // The Full guide's menu (◀ from a channel, or Back): the sections, the guide's controls, the categories.
     var panelOpen by remember { mutableStateOf(false) }
+    // The Full menu shows its icons while the categories have focus, its names and the guide controls
+    // once focus is in it (◀ or Back from the categories), as TiviMate's does.
+    var panelNames by remember { mutableStateOf(false) }
+    LaunchedEffect(panelOpen) { if (!panelOpen) panelNames = false }
     BackHandler(enabled = look.full && !panelOpen && !inCellMode && gridHasFocus) { panelOpen = true }
     // The programme the block on top shows and the buttons act on: the one under the cursor.
     var selected by remember { mutableStateOf<Pair<ChannelEntity, EpgProgrammeEntity?>?>(null) }
@@ -444,9 +448,10 @@ fun EpgScreen(
         }
         val shown = full ?: topProgramme
         val viewDay = localMidnight(timeAt(scrollPx + timelinePx * 3f / 8f))
-        // The Full menu's two columns, each 390; the guide slides right by that much, as TiviMate's does.
-        val panelW = fx(390)
-        val slide by animateDpAsState(if (panelOpen && fullNav != null) panelW * 2 else 0.dp, label = "guideSlide")
+        // The Full menu's two columns: the categories 390, the menu 112 as icons or 390 with names. The
+        // guide slides right by that much, as TiviMate's does.
+        val panelW = fx(tv.own.owntv.features.shell.components.PANEL_SHEET_PX)
+        val slide by animateDpAsState(if (panelOpen && fullNav != null) panelW + (if (panelNames) panelW else 0.dp) else 0.dp, label = "guideSlide")
 
         Column(Modifier.fillMaxSize().offset(x = slide)) {
         // Top (44 → 404): the video, and beside it the programme under the cursor. While the guide is
@@ -703,7 +708,9 @@ fun EpgScreen(
                     onAutoMatch = vm::autoMatchEpg,
                     onListView = onListView.takeIf { liveMode },
                 ),
-                menuWidth = panelW,
+                menuWidth = if (panelNames) panelW else 0.dp,
+                names = panelNames,
+                onMenuFocus = { panelNames = it },
                 categoryWidth = panelW,
                 categoryFocus = sheetFocus,
                 onClose = { panelOpen = false },

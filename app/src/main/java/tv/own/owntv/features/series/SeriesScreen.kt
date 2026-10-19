@@ -2,6 +2,8 @@
 
 package tv.own.owntv.features.series
 
+import tv.own.owntv.features.shell.components.PANEL_SHEET_PX
+import tv.own.owntv.features.shell.components.panelSheetColumn
 import tv.own.owntv.ui.stage.backdropLeftWash
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.heightIn
@@ -169,6 +171,8 @@ fun SeriesScreen(
     lockedKey: LiveKey? = null,
     /** Hands the shell this screen's way in from the rail (Separate: the open category; Cinematic: the title). */
     onEntryHook: (((() -> Boolean)?) -> Unit)? = null,
+    /** Full height navigation: the categories sheet stays open beside its menu (see PanelSheetHook). */
+    onPanelSheet: tv.own.owntv.features.shell.components.PanelSheetHook? = null,
 ) {
     val vm: SeriesViewModel = koinViewModel()
     // Locking and unlocking are one pair: the pin belongs to this screen's lifetime, not to the view
@@ -216,6 +220,7 @@ fun SeriesScreen(
             onRestoredSelected = { returnToShowId = null; returnToIndex = -1 },
             lockedKey = lockedKey,
             onEntryHook = onEntryHook,
+            onPanelSheet = onPanelSheet,
             modifier = modifier,
         )
     }
@@ -232,6 +237,8 @@ private fun SeriesGrid(
     /** Non-null while this grid is a More screen's stage — see [SeriesScreen]. */
     lockedKey: LiveKey? = null,
     onEntryHook: (((() -> Boolean)?) -> Unit)? = null,
+    /** Full height navigation: the categories sheet stays open beside its menu (see PanelSheetHook). */
+    onPanelSheet: tv.own.owntv.features.shell.components.PanelSheetHook? = null,
     modifier: Modifier,
 ) {
     val alreadyDownloadedMessage = stringResource(R.string.content_already_downloaded)
@@ -495,12 +502,18 @@ private fun SeriesGrid(
     val headerLabel = if (selectedItem?.key is LiveKey.Folder || selectedItem?.key is LiveKey.Custom) ProviderTags.parse(selectedLabel).name else selectedLabel
 
     // Back closes the sheet: one level out.
-    androidx.activity.compose.BackHandler(enabled = categoriesOpen) { categoriesOpen = false; focusCurrentTitle() }
+    androidx.activity.compose.BackHandler(enabled = categoriesOpen && onPanelSheet == null) { categoriesOpen = false; focusCurrentTitle() }
+    // Full height, as TiviMate: Back walks out the way ◀ does, list to categories (then the shell's
+    // menu, then its exit prompt).
+    var listFocused by remember { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler(enabled = onPanelSheet != null && !categoriesOpen && listFocused && lockedKey == null) { if (cinematic) categoriesOpen = true else runCatching { railFocus.requestFocus() } }
     LaunchedEffect(categoriesOpen) {
-        if (categoriesOpen) { withFrameNanos { }; runCatching { railFocus.requestFocus() } }
+        // Full height opens on the open category, as TiviMate does, not on the sheet's search field.
+        if (categoriesOpen) { withFrameNanos { }; if (onPanelSheet != null) railFocusRow = selectedIndex else runCatching { railFocus.requestFocus() } }
         // However the sheet closed (Back, a pick, ◀ to the rail), the next one starts fresh.
         else sheetHadFocus = false
     }
+    tv.own.owntv.features.shell.components.ReportPanelSheet(onPanelSheet, categoriesOpen, railFocus)
     // CH± in the categories moves the highlight only; OK picks.
     var catFocusIndex by remember { mutableStateOf<Int?>(null) }
     val categoriesModifier = Modifier
@@ -509,7 +522,7 @@ private fun SeriesGrid(
             // The sheet closes when focus leaves it (◀ to the rail) — not while its own menus are open,
             // and not on the "unfocused" report every node gets when it first attaches.
             if (it.hasFocus) sheetHadFocus = true
-            else if (sheetHadFocus && categoriesOpen && contextCategory == null && categoryMoveState == null) {
+            else if (sheetHadFocus && categoriesOpen && contextCategory == null && categoryMoveState == null && onPanelSheet == null) {
                 sheetHadFocus = false
                 categoriesOpen = false
             }
@@ -626,7 +639,14 @@ private fun SeriesGrid(
         if (cinematic) {
             val heroH = if (panelShares != null) maxHeight * (cinematicDetailsPct / 100f) else 464.mpx
             val toolTop = 122.mpx + heroH
-            Box(Modifier.fillMaxSize().then(if (categoriesOpen) Modifier.graphicsLayer { alpha = 0.36f } else Modifier)) {
+            Box(Modifier.fillMaxSize().onFocusChanged { listFocused = it.hasFocus; if (it.hasFocus && onPanelSheet != null) categoriesOpen = false }.then(
+                    when {
+                        !categoriesOpen -> Modifier
+                        // Full height moves the screen aside for its column, as the guide does.
+                        onPanelSheet != null -> Modifier.graphicsLayer { translationX = fx(PANEL_SHEET_PX).toPx() }
+                        else -> Modifier.graphicsLayer { alpha = 0.36f }
+                    },
+                )) {
                 VodCinematicBackdrop(titleInfo?.backdropUrl, series = true, Modifier.align(Alignment.TopEnd))
                 VodHeader(
                     section = stringResource(R.string.common_nav_series), category = headerLabel, count = vodCount(true, count),
@@ -884,17 +904,18 @@ private fun SeriesGrid(
                 entries = categoryEntries,
                 selectedIndex = selectedIndex,
                 groupsHeading = groupsHeading,
-                sheet = true,
+                sheet = onPanelSheet == null,
                 listState = catListState,
                 onSelect = onCategorySelect,
                 onLongSelect = onCategoryLongSelect,
-                onNavigateRight = { categoriesOpen = false; focusTitles() },
+                onNavigateRight = { if (onPanelSheet == null) categoriesOpen = false; focusTitles() },
                 focusRequester = railFocus,
                 focusRowIndex = railFocusRow,
                 onRowFocused = { railFocusRow = null },
                 onRowFocus = { catFocusIndex = it },
                 sheetHint = stringResource(R.string.common_nav_series),
-                modifier = categoriesModifier
+                // Full height: the Full TV Guide's flat column beside the menu, not a card over the screen.
+                modifier = if (onPanelSheet != null) categoriesModifier.panelSheetColumn(fx(PANEL_SHEET_PX)) else categoriesModifier
                     .padding(start = fx(24), top = 24.mpx, bottom = 24.mpx)
                     .width(
                         // Panel widths › Categories sheet (Cinematic): its own % of the screen, as Live TV's Stage sheet.

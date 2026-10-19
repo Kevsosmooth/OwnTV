@@ -51,6 +51,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.ui.focus.FocusRequester as RowFocus
+import tv.own.owntv.features.shell.components.PANEL_SHEET_PX
+import tv.own.owntv.features.shell.components.panelSheetColumn
 import tv.own.owntv.ui.theme.mpx
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -106,6 +108,10 @@ fun LiveScreen(
     lockedKey: LiveKey? = null,
     /** Guide view (Live TV tool row): opens the TV Guide until an in-place guide exists. */
     onOpenGuide: () -> Unit = {},
+    /** Receives the way in from the menu (the current channel's row), as EpgScreen's onEntryHook. */
+    onEntryHook: (((() -> Boolean)?) -> Unit)? = null,
+    /** Full height navigation: the categories sheet stays open beside its menu (see PanelSheetHook). */
+    onPanelSheet: tv.own.owntv.features.shell.components.PanelSheetHook? = null,
 ) {
     val vm: LiveViewModel = koinViewModel()
     // Locking and unlocking are one pair: the pin belongs to this screen's lifetime, not to the view
@@ -485,18 +491,27 @@ fun LiveScreen(
         runCatching { selFocus.requestFocus() }.getOrDefault(false) ||
             runCatching { contextFocus.requestFocus() }.getOrDefault(false) ||
             runCatching { firstItemFocus.requestFocus() }.getOrDefault(false)
+    DisposableEffect(onEntryHook) {
+        onEntryHook?.invoke { channels.itemCount > 0 && focusCurrentRow() }
+        onDispose { onEntryHook?.invoke(null) }
+    }
     val categoriesVisible = lockedKey == null && (separate || categoriesOpen)
     val railCounts by (if (categoriesVisible) vm.railCounts else remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap<LiveKey, Int>()) })
         .collectAsStateWithLifecycle()
     val scheduleFocus = remember { FocusRequester() }
     var openProgramme by remember { mutableStateOf<Pair<ChannelEntity, tv.own.owntv.core.parser.XtEpgEntry>?>(null) }
     // Back closes the sheet: one level out.
-    androidx.activity.compose.BackHandler(enabled = categoriesOpen) { categoriesOpen = false; focusCurrentRow() }
+    androidx.activity.compose.BackHandler(enabled = categoriesOpen && onPanelSheet == null) { categoriesOpen = false; focusCurrentRow() }
+    // Full height, as TiviMate: Back walks out the way ◀ does, list to categories (then the shell's
+    // menu, then its exit prompt).
+    var listFocused by remember { mutableStateOf(false) }
+    androidx.activity.compose.BackHandler(enabled = onPanelSheet != null && !categoriesOpen && listFocused && lockedKey == null) { if (separate) runCatching { railFocus.requestFocus() } else categoriesOpen = true }
     LaunchedEffect(categoriesOpen) {
         if (categoriesOpen) { withFrameNanos { }; runCatching { railFocus.requestFocus() } }
         // However the sheet closed (Back, a pick, ◀ to the rail), the next one starts fresh.
         else sheetHadFocus = false
     }
+    tv.own.owntv.features.shell.components.ReportPanelSheet(onPanelSheet, categoriesOpen, railFocus)
 
     // Focus from the categories to the channel list: the remembered channel, else the first row.
     fun focusChannelList() {
@@ -531,7 +546,7 @@ fun LiveScreen(
             // The sheet closes when focus leaves it (◀ to the rail) — not while its own menus are open,
             // and not on the "unfocused" report every node gets when it first attaches.
             if (it.hasFocus) sheetHadFocus = true
-            else if (sheetHadFocus && categoriesOpen && contextCategory == null && categoryMoveState == null) {
+            else if (sheetHadFocus && categoriesOpen && contextCategory == null && categoryMoveState == null && onPanelSheet == null) {
                 sheetHadFocus = false
                 categoriesOpen = false
             }
@@ -641,7 +656,15 @@ fun LiveScreen(
         Box(
             Modifier
                 .fillMaxSize()
-                .then(if (categoriesOpen) Modifier.graphicsLayer { alpha = 0.4f } else Modifier),
+                .onFocusChanged { listFocused = it.hasFocus; if (it.hasFocus && onPanelSheet != null) categoriesOpen = false }
+                .then(
+                    when {
+                        !categoriesOpen -> Modifier
+                        // Full height moves the screen aside for its column, as the guide does.
+                        onPanelSheet != null -> Modifier.graphicsLayer { translationX = fx(PANEL_SHEET_PX).toPx() }
+                        else -> Modifier.graphicsLayer { alpha = 0.4f }
+                    },
+                ),
         ) {
             LiveHeader(
                 category = headerLabel,
@@ -890,18 +913,19 @@ fun LiveScreen(
                 entries = categoryEntries,
                 selectedIndex = selectedIndex,
                 groupsHeading = groupsHeading,
-                sheet = true,
+                sheet = onPanelSheet == null,
                 listState = catListState,
                 onSelect = onCategorySelect,
                 onLongSelect = onCategoryLongSelect,
-                onNavigateRight = { categoriesOpen = false; focusChannelList() },
+                onNavigateRight = { if (onPanelSheet == null) categoriesOpen = false; focusChannelList() },
                 focusRequester = railFocus,
                 focusRowIndex = railFocusRow,
                 onRowFocused = { railFocusRow = null },
                 onRowFocus = { catFocusIndex = it },
                 searchQuery = categoryQuery,
                 onSearchQueryChange = vm::setCategoryQuery,
-                modifier = categoriesModifier
+                // Full height: the Full TV Guide's flat column beside the menu, not a card over the screen.
+                modifier = if (onPanelSheet != null) categoriesModifier.panelSheetColumn(fx(PANEL_SHEET_PX)) else categoriesModifier
                     .padding(start = fx(24), top = 24.mpx, bottom = 24.mpx)
                     .width(sheetW)
                     .fillMaxHeight(),

@@ -1872,6 +1872,7 @@ private fun navStyleLabel(style: tv.own.owntv.core.settings.SettingsRepository.N
     when (style) {
         tv.own.owntv.core.settings.SettingsRepository.NavStyle.FLOATING -> R.string.settings_nav_floating
         tv.own.owntv.core.settings.SettingsRepository.NavStyle.DOCKED -> R.string.settings_nav_docked
+        tv.own.owntv.core.settings.SettingsRepository.NavStyle.PANEL -> R.string.settings_nav_panel
     },
 )
 
@@ -2821,8 +2822,11 @@ private fun stageRowExtras(
             else listOfNotNull(weatherPlace.ifBlank { null }, stringResource(if (fahrenheit) R.string.settings_degree_fahrenheit else R.string.settings_degree_celsius)).joinToString(sep),
         )),
         "navigation" to RowExtra(
-            SettingValue.Opens(navStyleLabel(navStyle) + sep + stringResource(navSize.labelRes)),
-            choices = listOf(stringResource(R.string.settings_nav_floating), stringResource(R.string.settings_nav_docked)),
+            SettingValue.Opens(
+                if (navStyle == tv.own.owntv.core.settings.SettingsRepository.NavStyle.PANEL) navStyleLabel(navStyle)
+                else navStyleLabel(navStyle) + sep + stringResource(navSize.labelRes),
+            ),
+            choices = listOf(stringResource(R.string.settings_nav_floating), stringResource(R.string.settings_nav_docked), stringResource(R.string.settings_nav_panel)),
             chosen = navStyle.ordinal,
             recommended = 1,
         ),
