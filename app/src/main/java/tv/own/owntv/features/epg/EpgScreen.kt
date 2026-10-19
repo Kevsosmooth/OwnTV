@@ -210,11 +210,16 @@ fun EpgScreen(
     // The focused channel plays in the video after the focus settles, as in Live TV.
     val effectivePreview = previewEnabled && livePreviewSetting && guidePreview
     // Switching the Guide's own preview off stops what is already playing, not only the next channel.
-    LaunchedEffect(guidePreview) { if (!guidePreview && previewEnabled) liveVm.stopPreview() }
+    // Also on the way back from full screen, which hands the guide the channel still playing.
+    LaunchedEffect(guidePreview, previewEnabled) { if (!guidePreview && previewEnabled) liveVm.stopPreview() }
+    // The first channel the guide shows plays at once (back from full screen it is the one already
+    // playing, kept without a reload); later ones wait for the focus to settle.
+    var previewStarted by remember { mutableStateOf(false) }
     LaunchedEffect(previewChannel?.id, effectivePreview, previewArmed) {
         if (!effectivePreview || !previewArmed) return@LaunchedEffect
         val ch = previewChannel ?: return@LaunchedEffect
-        delay(700)
+        if (previewStarted) delay(700)
+        previewStarted = true
         liveVm.playPreview(ch)
     }
 

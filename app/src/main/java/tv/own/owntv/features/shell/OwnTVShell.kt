@@ -550,7 +550,9 @@ fun OwnTVShell(
         liveVm.onFullscreenExited() // no longer full-screen on ExoPlayer → let the preview re-take the engine
         player.stop()
         subtitleController.clear() // leaving the player drops the OpenSubtitles item context
-        if (selectedSection != MainSection.LIVE_TV) liveVm.clearLiveOnExo()
+        // Live TV and the TV Guide hand the channel back to their preview still playing (the guide's own
+        // preview switch, if off, stops it there); anywhere else the stream is let go.
+        if (selectedSection != MainSection.LIVE_TV && selectedSection != MainSection.EPG) liveVm.clearLiveOnExo()
         restoreFocus = true
         focusRail()
         Unit
