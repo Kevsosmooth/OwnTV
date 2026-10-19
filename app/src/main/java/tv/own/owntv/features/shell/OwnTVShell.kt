@@ -231,7 +231,7 @@ fun OwnTVShell(
         MainSection.SPORTS -> sportsEntry
         else -> null
     }
-    // Navigation = Full height (PanelRail): its state lives in [PanelNav], out of this already long body.
+    // Navigation = Side panel (PanelRail): its state lives in [PanelNav], out of this already long body.
     val panel = tv.own.owntv.features.shell.components.rememberPanelNav(
         navStyle == tv.own.owntv.core.settings.SettingsRepository.NavStyle.PANEL, sectionEntry, contentAreaFocus,
     )
@@ -276,11 +276,10 @@ fun OwnTVShell(
     // up/down (CH+/CH-). Guide tunes start through LiveViewModel too (they set zapSource = LIVE_TV), so
     // there is exactly ONE zap path: liveVm's. The Guide keeps its own EpgViewModel only for the grid.
     val liveVm = org.koin.androidx.compose.koinViewModel<LiveViewModel>()
-    // TV Guide style Full: the guide (and Live TV's Guide view) fills the screen with no rail; its own
+    // Side panel navigation draws the guide (and Live TV's Guide view) full screen with no rail; its own
     // menu stands in for the rail (GuideFullPanel).
-    val guideStyle by settingsRepo.guideStyle.collectAsStateWithLifecycle(initialValue = tv.own.owntv.core.settings.SettingsRepository.GuideStyle.STANDARD)
     val topLiveView by liveVm.liveView.collectAsStateWithLifecycle()
-    val guideFull = guideStyle == tv.own.owntv.core.settings.SettingsRepository.GuideStyle.FULL &&
+    val guideFull = panelNav &&
         (selectedSection == MainSection.EPG ||
             (selectedSection == MainSection.LIVE_TV && topLiveView == tv.own.owntv.core.settings.SettingsRepository.LiveView.GUIDE))
     // "Previous" from the system media controls on a live channel goes back a channel.
@@ -518,7 +517,7 @@ fun OwnTVShell(
             }
             tv.own.owntv.core.settings.StartupMode.HOME -> Unit
         }
-        // Full height: focus was parked in Home, which the start-up screen just replaced; hand it over.
+        // Side panel: focus was parked in Home, which the start-up screen just replaced; hand it over.
         if (panel.enabled && playerMode == PlayerMode.NONE) panel.park(focusRail)
     }
 
@@ -1058,9 +1057,8 @@ fun OwnTVShell(
                   selected = selectedSection,
                   onSelect = { section ->
                       selectFromNav(section)
-                      // The new screen has the rail again (unless it is a Full guide too, which focuses
-                      // itself); with Full height navigation it is entered instead.
-                      if (panelNav) panel.enterPicked() else scope.launch { androidx.compose.runtime.withFrameNanos { }; focusRail() }
+                      // The new screen is entered, as one picked from the Side panel menu is.
+                      panel.enterPicked()
                   },
                   onBack = { showExit = true },
               )
@@ -1135,7 +1133,7 @@ fun OwnTVShell(
                             // The floating rail sits over the content, so the content starts at the screen
                             // edge (or beside a docked rail).
                             Modifier
-                                // Full height pushes the content over, as TiviMate's menu does.
+                                // Side panel pushes the content over, as TiviMate's menu does.
                                 .graphicsLayer { translationX = panelPush.toPx() * (if (contentLtr) 1f else -1f) }
                                 .padding(
                                     start = if (!guideFull && navStyle == tv.own.owntv.core.settings.SettingsRepository.NavStyle.DOCKED) {
@@ -1328,7 +1326,7 @@ fun OwnTVShell(
                             previewEnabled = playerMode == PlayerMode.NONE,
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
-                            // Full height enters the list on its channel; the rail styles keep ▶'s own way.
+                            // Side panel enters the list on its channel; the rail styles keep ▶'s own way.
                             onEntryHook = if (panelNav) { { guideEntry = it } } else null,
                             onPanelSheet = if (panelNav) panel::sheet else null,
                             modifier = Modifier.fillMaxSize(),
@@ -1396,7 +1394,7 @@ fun OwnTVShell(
             }
           }
             // The Full guide shows no pills or clock, as TiviMate's doesn't: the time is on its ruler.
-            // The Audio-mode bar still shows, being the only way to that playback. The Full height menu,
+            // The Audio-mode bar still shows, being the only way to that playback. The Side panel menu,
             // with the content moved aside beneath them, hides them too while it is open.
             if ((!guideFull && panelPush == 0.dp) || audioBarContent != null) tv.own.owntv.features.shell.components.StageStatusCluster(
                 continuePill = continueTarget?.let { target ->

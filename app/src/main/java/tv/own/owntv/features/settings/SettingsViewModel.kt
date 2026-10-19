@@ -974,9 +974,6 @@ class SettingsViewModel(
     val liveLayout: StateFlow<tv.own.owntv.core.settings.SettingsRepository.LiveLayout> =
         settings.liveLayout.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.SettingsRepository.LiveLayout.STAGE)
     fun setLiveLayout(layout: tv.own.owntv.core.settings.SettingsRepository.LiveLayout) { viewModelScope.launch { settings.setLiveLayout(layout) } }
-    val guideStyle: StateFlow<tv.own.owntv.core.settings.SettingsRepository.GuideStyle> =
-        settings.guideStyle.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.SettingsRepository.GuideStyle.STANDARD)
-    fun setGuideStyle(style: tv.own.owntv.core.settings.SettingsRepository.GuideStyle) { viewModelScope.launch { settings.setGuideStyle(style) } }
     val liveView: StateFlow<tv.own.owntv.core.settings.SettingsRepository.LiveView> =
         settings.liveView.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), tv.own.owntv.core.settings.SettingsRepository.LiveView.LIST)
     fun setLiveView(view: tv.own.owntv.core.settings.SettingsRepository.LiveView) { viewModelScope.launch { settings.setLiveView(view) } }

@@ -654,7 +654,6 @@
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	group_sources
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	group_watching
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	guide_days
-1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	guide_style
 1	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	https://
 2	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	jpeg
 2	technical	app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt	jpg

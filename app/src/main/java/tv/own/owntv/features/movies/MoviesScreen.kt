@@ -143,7 +143,7 @@ fun MoviesScreen(
     lockedKey: LiveKey? = null,
     /** Hands the shell this screen's way in from the rail (Separate: the open category; Cinematic: the title). */
     onEntryHook: (((() -> Boolean)?) -> Unit)? = null,
-    /** Full height navigation: the categories sheet stays open beside its menu (see PanelSheetHook). */
+    /** Side panel navigation: the categories sheet stays open beside its menu (see PanelSheetHook). */
     onPanelSheet: tv.own.owntv.features.shell.components.PanelSheetHook? = null,
 ) {
     val vm: MovieViewModel = koinViewModel()
@@ -446,12 +446,12 @@ fun MoviesScreen(
 
     // Back closes the sheet: one level out.
     androidx.activity.compose.BackHandler(enabled = categoriesOpen && onPanelSheet == null) { categoriesOpen = false; focusCurrentTitle() }
-    // Full height, as TiviMate: Back walks out the way ◀ does, list to categories (then the shell's
+    // Side panel, as TiviMate: Back walks out the way ◀ does, list to categories (then the shell's
     // menu, then its exit prompt).
     var listFocused by remember { mutableStateOf(false) }
     androidx.activity.compose.BackHandler(enabled = onPanelSheet != null && !categoriesOpen && listFocused && lockedKey == null) { if (cinematic) categoriesOpen = true else runCatching { railFocus.requestFocus() } }
     LaunchedEffect(categoriesOpen) {
-        // Full height opens on the open category, as TiviMate does, not on the sheet's search field.
+        // Side panel opens on the open category, as TiviMate does, not on the sheet's search field.
         if (categoriesOpen) { withFrameNanos { }; if (onPanelSheet != null) railFocusRow = selectedIndex else runCatching { railFocus.requestFocus() } }
         // However the sheet closed (Back, a pick, ◀ to the rail), the next one starts fresh.
         else sheetHadFocus = false
@@ -586,7 +586,7 @@ fun MoviesScreen(
             Box(Modifier.fillMaxSize().onFocusChanged { listFocused = it.hasFocus; if (it.hasFocus && onPanelSheet != null) categoriesOpen = false }.then(
                     when {
                         !categoriesOpen -> Modifier
-                        // Full height moves the screen aside for its column, as the guide does.
+                        // Side panel moves the screen aside for its column, as the guide does.
                         onPanelSheet != null -> Modifier.graphicsLayer { translationX = fx(PANEL_SHEET_PX).toPx() }
                         else -> Modifier.graphicsLayer { alpha = 0.36f }
                     },
@@ -866,7 +866,7 @@ fun MoviesScreen(
                 onRowFocused = { railFocusRow = null },
                 onRowFocus = { catFocusIndex = it },
                 sheetHint = stringResource(R.string.common_nav_movies),
-                // Full height: the Full TV Guide's flat column beside the menu, not a card over the screen.
+                // Side panel: the Full TV Guide's flat column beside the menu, not a card over the screen.
                 modifier = if (onPanelSheet != null) categoriesModifier.panelSheetColumn(fx(PANEL_SHEET_PX)) else categoriesModifier
                     .padding(start = fx(24), top = 24.mpx, bottom = 24.mpx)
                     .width(

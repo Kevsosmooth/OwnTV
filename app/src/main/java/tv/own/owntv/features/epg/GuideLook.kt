@@ -5,8 +5,8 @@ import androidx.compose.ui.unit.Dp
 import tv.own.owntv.ui.theme.mpx
 
 /**
- * The sizes that differ between the guide styles (Layout › TV Guide style). [Standard] is the Stage
- * guide; [Full] fills the screen as TiviMate does: a smaller top area, no control line, about seven
+ * The sizes that differ between the guide styles. [Standard] is the Stage guide; [Full] (Navigation =
+ * Side panel) fills the screen as TiviMate does: a smaller top area, no control line, about seven
  * taller rows with a big logo, and one-line programme cells. Edges are in 1920 px units (`fx`).
  */
 @Immutable

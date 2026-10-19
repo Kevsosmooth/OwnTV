@@ -110,7 +110,7 @@ fun LiveScreen(
     onOpenGuide: () -> Unit = {},
     /** Receives the way in from the menu (the current channel's row), as EpgScreen's onEntryHook. */
     onEntryHook: (((() -> Boolean)?) -> Unit)? = null,
-    /** Full height navigation: the categories sheet stays open beside its menu (see PanelSheetHook). */
+    /** Side panel navigation: the categories sheet stays open beside its menu (see PanelSheetHook). */
     onPanelSheet: tv.own.owntv.features.shell.components.PanelSheetHook? = null,
 ) {
     val vm: LiveViewModel = koinViewModel()
@@ -502,7 +502,7 @@ fun LiveScreen(
     var openProgramme by remember { mutableStateOf<Pair<ChannelEntity, tv.own.owntv.core.parser.XtEpgEntry>?>(null) }
     // Back closes the sheet: one level out.
     androidx.activity.compose.BackHandler(enabled = categoriesOpen && onPanelSheet == null) { categoriesOpen = false; focusCurrentRow() }
-    // Full height, as TiviMate: Back walks out the way ◀ does, list to categories (then the shell's
+    // Side panel, as TiviMate: Back walks out the way ◀ does, list to categories (then the shell's
     // menu, then its exit prompt).
     var listFocused by remember { mutableStateOf(false) }
     androidx.activity.compose.BackHandler(enabled = onPanelSheet != null && !categoriesOpen && listFocused && lockedKey == null) { if (separate) runCatching { railFocus.requestFocus() } else categoriesOpen = true }
@@ -660,7 +660,7 @@ fun LiveScreen(
                 .then(
                     when {
                         !categoriesOpen -> Modifier
-                        // Full height moves the screen aside for its column, as the guide does.
+                        // Side panel moves the screen aside for its column, as the guide does.
                         onPanelSheet != null -> Modifier.graphicsLayer { translationX = fx(PANEL_SHEET_PX).toPx() }
                         else -> Modifier.graphicsLayer { alpha = 0.4f }
                     },
@@ -924,7 +924,7 @@ fun LiveScreen(
                 onRowFocus = { catFocusIndex = it },
                 searchQuery = categoryQuery,
                 onSearchQueryChange = vm::setCategoryQuery,
-                // Full height: the Full TV Guide's flat column beside the menu, not a card over the screen.
+                // Side panel: the Full TV Guide's flat column beside the menu, not a card over the screen.
                 modifier = if (onPanelSheet != null) categoriesModifier.panelSheetColumn(fx(PANEL_SHEET_PX)) else categoriesModifier
                     .padding(start = fx(24), top = 24.mpx, bottom = 24.mpx)
                     .width(sheetW)

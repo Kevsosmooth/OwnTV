@@ -154,7 +154,7 @@ private fun cursorStep(progs: List<EpgProgrammeEntity>, cursor: Long, dir: Int, 
  * With [liveMode] this is Live TV's Guide view: the category is Live TV's own, the title says
  * Live TV, and List view goes back to the channel list.
  *
- * With [fullNav] (TV Guide style Full) the guide fills the screen: the shell has no rail on it, there
+ * With [fullNav] (Navigation = Side panel) the guide fills the screen: the shell has no rail on it, there
  * is no control line, the rows are taller, and ◀ from a channel (or Back) opens [GuideFullPanel].
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)

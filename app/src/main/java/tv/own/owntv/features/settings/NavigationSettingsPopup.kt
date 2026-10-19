@@ -81,7 +81,7 @@ fun NavigationSettingsPopup(
             )
         }
         StagePopupDivider()
-        // Full height has one size and length: the screens, as TiviMates menu.
+        // Side panel has one size and length: the screens, as TiviMates menu.
         if (style != NavStyle.PANEL) StagePopupOption(
             title = stringResource(R.string.settings_size),
             subtitle = stringResource(R.string.settings_nav_size_desc),

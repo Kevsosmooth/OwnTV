@@ -56,7 +56,7 @@ import tv.own.owntv.ui.theme.LocalStagePalette
 import tv.own.owntv.ui.theme.mpx
 import tv.own.owntv.ui.theme.ownTvTween
 
-/** Whether the Full height menu is open: gone, or the icons with their names. */
+/** Whether the Side panel menu is open: gone, or the icons with their names. */
 enum class PanelStep { CLOSED, NAMES }
 
 /** The closed menu's strip, kept just past the edge so the app can still hand it focus. */
@@ -76,7 +76,7 @@ private const val PANEL_ENTER_RETRY_MS = 8000L
 private const val PANEL_ENTER_STEP_MS = 100L
 
 /**
- * Navigation = Full height, as the shell drives it: whether it is the chosen style ([enabled]) and shown
+ * Navigation = Side panel, as the shell drives it: whether it is the chosen style ([enabled]) and shown
  * ([shown], on ◀ or Back out of the content or a key pressed on it, not when the app merely parks focus
  * there). It resets as focus leaves the menu.
  */
@@ -160,7 +160,7 @@ class PanelNav internal constructor(private val scope: CoroutineScope, private v
 }
 
 /**
- * How a screen with a categories sheet tells the Full height menu about it: the way back into the sheet
+ * How a screen with a categories sheet tells the Side panel menu about it: the way back into the sheet
  * while it is open, else null. With the hook set the sheet stays open while the menu has focus and
  * closes as its own list takes focus instead, so ◀ ◀ from the list goes sheet, then menu, and ▶ ▶ back.
  */
@@ -185,7 +185,7 @@ fun rememberPanelNav(enabled: Boolean, entry: (() -> Boolean)?, contentFocus: Fo
     }
 }
 
-/** A screen's categories column beside the Full height menu, in 1920-wide pixels (the Full TV Guide's too). */
+/** A screen's categories column beside the Side panel menu, in 1920-wide pixels (the Full TV Guide's too). */
 const val PANEL_SHEET_PX = 390
 
 /** A screen's categories as the Full TV Guide draws them: a flat column [width] wide, the height of the screen. */
@@ -204,7 +204,7 @@ internal fun animatePanelPush(step: PanelStep): State<Dp> = animateDpAsState(
 )
 
 /**
- * The Full height menu's items, from the top of the screen: [leading] (Now Playing), the [sections], then
+ * The Side panel menu's items, from the top of the screen: [leading] (Now Playing), the [sections], then
  * [extra] (the Full guide's own controls). [names] shows each icon's name; without it the active
  * section is boxed. ◀ into it lands on the open section ([sectionFocus]), then on whatever had focus last.
  */
@@ -251,7 +251,7 @@ fun PanelMenu(
 }
 
 /**
- * Navigation = Full height: the menu the height of the screen at its edge, as TiviMate's. It is gone
+ * Navigation = Side panel: the menu the height of the screen at its edge, as TiviMate's. It is gone
  * while focus is in the content; ◀ (or Back) opens it ([onShow]) with its names, and ▶ goes back into
  * the content ([enterContent]: an open sheet, then the screen's own way in). The shell moves the content
  * aside by [animatePanelPush] of the same [step].
