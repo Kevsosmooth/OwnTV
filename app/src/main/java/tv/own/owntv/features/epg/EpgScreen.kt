@@ -884,7 +884,14 @@ private fun GuideRow(
                             val repeat = e.nativeKeyEvent.repeatCount
                             if (down && repeat == 0) okDown = true
                             else if (down && okDown) { okDown = false; onMenu(programmeAt(progs, cursorTime)) }
-                            else if (!down && okDown) { okDown = false; if (cellMode) onOk(programmeAt(progs, cursorTime)) else onEnterCell() }
+                            // The Full guide, as TiviMate's, plays the channel on the first OK; the others step
+                            // into its programmes first.
+                            else if (!down && okDown) {
+                                okDown = false
+                                if (cellMode) onOk(programmeAt(progs, cursorTime))
+                                else if (look.full) onOk(programmeAt(progs, System.currentTimeMillis()))
+                                else onEnterCell()
+                            }
                             true
                         }
                         Key.Menu -> { if (down) onMenu(programmeAt(progs, cursorTime)); true }
