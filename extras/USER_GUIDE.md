@@ -319,6 +319,9 @@ For a provider publishing its guide in another time zone. A re-sync never undoes
 - **Icons on a programme** — recording, reminder set, or replayable from the archive.
 - **Long-press a channel label** for the channel's own menu (favourite, Match EPG…).
 - **Settings → Layout → Guide column widths** — channel list vs timeline, must total 100%.
+- **Settings → Layout → TV Guide style** — **Standard**, or **Full**: the guide fills the screen with
+  about seven bigger rows; Left opens the menu, the guide controls and the categories, and the first OK
+  on a channel plays it.
 
 ---
 
@@ -555,6 +558,9 @@ switch channel rows between **Cards** and **On now** (an inline mini-guide).
 - **Floating** — rests as a small capsule over the content, opens when you move Left, and hides
   itself after **Hide after** (2, 4 or 8 s); Left at the edge calls it back. **Docked** — always on
   screen; the content makes room (recommended).
+- **Full height** (as a style) — gone while you browse; Left or Back opens a full-height menu with
+  the names and the content moves aside. Live TV, Movies and Series keep their categories as a column
+  beside it, Left and Right walk list, categories, menu and back, and Back retraces Left.
 - **Size** — **Compact** (icons), **Normal** (names), **Wide** (names and counts, profile line),
   **Extra wide** (also a detail line: last channel, the film to resume, downloads in progress…).
 - **Length** — **Fit to items**, or **Full height** with the profile at the bottom.
