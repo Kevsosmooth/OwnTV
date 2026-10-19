@@ -71,6 +71,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -261,6 +262,8 @@ fun MoviesScreen(
     val perCategoryGrid = remember { mutableStateMapOf<LiveKey, LazyGridState>() }
     val perCategoryList = remember { mutableStateMapOf<LiveKey, LazyListState>() }
     val perCategoryMovieIds = remember { mutableStateMapOf<LiveKey, Long>() }
+    // Counts titles taking focus (see focusCurrentTitle).
+    var titleFocusSeq by remember { mutableIntStateOf(0) }
     // NOTE: plain constructors, not remember*State() — these are created lazily inside getOrPut, so a
     // @Composable/rememberSaveable call here would register slots conditionally and corrupt the slot table.
     val effectiveGridState = if (rememberMovies) perCategoryGrid.getOrPut(selectedKey) { LazyGridState() } else gridState
@@ -390,10 +393,14 @@ fun MoviesScreen(
 
     // The title the cursor was on: after a long-press it carries contextFocus instead of selFocus
     // (gridFocusTarget prefers it), so both are tried before the first title (fix playbook 6).
+    // Entering the pane from outside goes through its onEnter, which focuses the title itself and cancels
+    // the original request, so that request reports false; a title having taken focus is what counts.
+    fun takesTitle(focus: FocusRequester): Boolean {
+        val before = titleFocusSeq
+        return runCatching { focus.requestFocus() }.getOrDefault(false) || titleFocusSeq != before
+    }
     fun focusCurrentTitle(): Boolean =
-        runCatching { selFocus.requestFocus() }.getOrDefault(false) ||
-            runCatching { contextFocus.requestFocus() }.getOrDefault(false) ||
-            runCatching { firstItemFocus.requestFocus() }.getOrDefault(false)
+        takesTitle(selFocus) || takesTitle(contextFocus) || takesTitle(firstItemFocus)
     // From the categories to the titles: the remembered movie, else the first; the search field when empty.
     fun focusTitles() {
         val targetId = if (rememberMovies) perCategoryMovieIds[selectedKey] ?: selectedMovie?.id else selectedMovie?.id
@@ -487,6 +494,7 @@ fun MoviesScreen(
     val targetMovieId = if (rememberMovies) perCategoryMovieIds[selectedKey] ?: selectedMovie?.id else selectedMovie?.id
     val openMenu: (MovieEntity, Int) -> Unit = { movie, index -> contextMovie = movie; contextMovieId = movie.id; contextMovieIndex = index }
     val onMovieFocus: (MovieEntity) -> Unit = { movie ->
+        titleFocusSeq++
         vm.onMovieFocused(movie)
         if (rememberMovies) perCategoryMovieIds[selectedKey] = movie.id
     }

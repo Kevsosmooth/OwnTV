@@ -319,6 +319,8 @@ private fun SeriesGrid(
     val perCategoryGrid = remember { mutableStateMapOf<LiveKey, androidx.compose.foundation.lazy.grid.LazyGridState>() }
     val perCategoryList = remember { mutableStateMapOf<LiveKey, androidx.compose.foundation.lazy.LazyListState>() }
     val perCategorySeriesIds = remember { mutableStateMapOf<LiveKey, Long>() }
+    // Counts shows taking focus (see focusCurrentTitle).
+    var titleFocusSeq by remember { mutableIntStateOf(0) }
     // NOTE: plain constructors, not remember*State() — these are created lazily inside getOrPut, so a
     // @Composable/rememberSaveable call here would register slots conditionally and corrupt the slot table.
     val effectiveGridState = if (rememberSeries) perCategoryGrid.getOrPut(selectedKey) { androidx.compose.foundation.lazy.grid.LazyGridState() } else gridState
@@ -454,10 +456,14 @@ private fun SeriesGrid(
 
     // The show the cursor was on: after a long-press it carries contextFocus instead of gridSelFocus
     // (gridFocusTarget prefers it), so both are tried before the first show (fix playbook 6).
+    // Entering the pane from outside goes through its onEnter, which focuses the show itself and cancels
+    // the original request, so that request reports false; a show having taken focus is what counts.
+    fun takesTitle(focus: FocusRequester): Boolean {
+        val before = titleFocusSeq
+        return runCatching { focus.requestFocus() }.getOrDefault(false) || titleFocusSeq != before
+    }
     fun focusCurrentTitle(): Boolean =
-        runCatching { gridSelFocus.requestFocus() }.getOrDefault(false) ||
-            runCatching { contextFocus.requestFocus() }.getOrDefault(false) ||
-            runCatching { firstItemFocus.requestFocus() }.getOrDefault(false)
+        takesTitle(gridSelFocus) || takesTitle(contextFocus) || takesTitle(firstItemFocus)
     // From the categories to the shows: the remembered one, else the first; the search field when empty.
     fun focusTitles() {
         val targetId = if (rememberSeries) perCategorySeriesIds[selectedKey] ?: selectedSeries?.id else selectedSeries?.id
@@ -551,6 +557,7 @@ private fun SeriesGrid(
     val targetSeriesId = if (rememberSeries) perCategorySeriesIds[selectedKey] ?: selectedSeries?.id else selectedSeries?.id
     val openMenu: (tv.own.owntv.core.database.entity.SeriesEntity, Int) -> Unit = { show, index -> contextSeries = show; contextSeriesId = show.id; contextSeriesIndex = index }
     val onShowFocus: (tv.own.owntv.core.database.entity.SeriesEntity) -> Unit = { show ->
+        titleFocusSeq++
         vm.onSeriesFocused(show)
         if (rememberSeries) perCategorySeriesIds[selectedKey] = show.id
     }
